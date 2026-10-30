@@ -453,8 +453,7 @@ Untuk mendapatkan hasil yg bagus, harap buka melalui google chrome terupdate dan
                     <!-- Action Buttons -->
                     <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
                         <!-- Button Copy -->
-                        <button onclick="copyGreeting(this, '${escapeQuotes(fullText)}')" 
-                                class="copy-btn py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-95">
+                        <button type="button" class="copy-btn py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-95">
                             <i class="fa-solid fa-copy text-slate-500"></i>
                             <span>Salin</span>
                         </button>
@@ -468,6 +467,8 @@ Untuk mendapatkan hasil yg bagus, harap buka melalui google chrome terupdate dan
                     </div>
                 `;
 
+                const copyButton = card.querySelector('.copy-btn');
+                copyButton.addEventListener('click', () => copyGreeting(copyButton, fullText));
                 grid.appendChild(card);
             });
         }
@@ -523,22 +524,42 @@ Untuk mendapatkan hasil yg bagus, harap buka melalui google chrome terupdate dan
         }
 
         // Copy Text Functionality
-        function copyGreeting(buttonEl, text) {
-            // Executive Clipboard Copy
+        async function copyGreeting(buttonEl, text) {
+            const copyWithLegacyApi = () => {
             const tempTextArea = document.createElement('textarea');
             tempTextArea.value = text;
+            tempTextArea.setAttribute('readonly', '');
+            tempTextArea.style.position = 'fixed';
+            tempTextArea.style.left = '-9999px';
             document.body.appendChild(tempTextArea);
-            tempTextArea.select();
-            
+
             try {
-                document.execCommand('copy');
-                
-                // Visual feedback on button
+                tempTextArea.focus();
+                tempTextArea.select();
+                tempTextArea.setSelectionRange(0, text.length);
+                if (!document.execCommand('copy')) {
+                    throw new Error('Browser menolak perintah salin.');
+                }
+            } finally {
+                document.body.removeChild(tempTextArea);
+            }
+            };
+
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                    } catch (clipboardError) {
+                        copyWithLegacyApi();
+                    }
+                } else {
+                    copyWithLegacyApi();
+                }
+
                 const originalContent = buttonEl.innerHTML;
                 buttonEl.classList.remove('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700');
                 buttonEl.classList.add('bg-emerald-600', 'text-white');
                 buttonEl.innerHTML = `<i class="fa-solid fa-check"></i> <span>Tersalin!</span>`;
-
                 showToast("Tersalin ke Clipboard!", "Teks ucapan siap ditempelkan di pesan Anda.");
 
                 setTimeout(() => {
@@ -546,11 +567,9 @@ Untuk mendapatkan hasil yg bagus, harap buka melalui google chrome terupdate dan
                     buttonEl.classList.add('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700');
                     buttonEl.innerHTML = originalContent;
                 }, 2000);
-
-            } catch (err) {
-                showToast("Gagal Menyalin", "Silakan salin teks secara manual.", true);
-            } finally {
-                document.body.removeChild(tempTextArea);
+            } catch (error) {
+                console.error('Gagal menyalin teks ucapan:', error);
+                showToast("Gagal Menyalin", "Browser tidak mengizinkan penyalinan. Salin teks secara manual.", true);
             }
         }
 
